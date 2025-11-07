@@ -6,6 +6,7 @@ from datetime import datetime
 from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
+import numpy as np
 
 # Page configuration
 st.set_page_config(
@@ -336,14 +337,17 @@ class FinanceLearningPlatform:
         }
 
     def calculate_progress(self, completed_lessons):
+        """Calculate overall progress percentage"""
         total_lessons = sum(len(course['lessons']) for course in self.courses.values())
         return (len(completed_lessons) / total_lessons) * 100 if total_lessons > 0 else 0
 
     def is_lesson_completed(self, course_id, lesson_id, user_progress):
+        """Check if a specific lesson is completed"""
         return any(lesson['course'] == course_id and lesson['id'] == lesson_id 
                   for lesson in user_progress['completed_lessons'])
 
     def mark_lesson_completed(self, course_id, lesson_id, user_progress):
+        """Mark a lesson as completed"""
         if not self.is_lesson_completed(course_id, lesson_id, user_progress):
             user_progress['completed_lessons'].append({
                 'course': course_id, 
@@ -451,7 +455,7 @@ def main():
             st.write("")  # Spacer
             st.write("")  # Spacer
             if st.button("Save Name", type="primary"):
-                if student_name.strip():
+                if student_name and student_name.strip():
                     st.session_state.user_progress['student_name'] = student_name.strip()
                     st.session_state.user_progress['student_name_set'] = True
                     st.success(f"Welcome, {student_name.strip()}! 🎉")
