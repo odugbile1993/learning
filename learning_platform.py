@@ -119,35 +119,6 @@ st.markdown("""
         border: 15px solid #FFD700;
         position: relative;
     }
-    .certificate-title {
-        font-size: 3rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
-        color: #FFD700;
-        text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
-    }
-    .certificate-subtitle {
-        font-size: 1.5rem;
-        margin-bottom: 2rem;
-        color: #FFF;
-    }
-    .certificate-name {
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin: 1rem 0;
-        color: #FFD700;
-        text-decoration: underline;
-    }
-    .certificate-course {
-        font-size: 2rem;
-        margin: 1rem 0;
-        color: #FFF;
-    }
-    .certificate-date {
-        font-size: 1.2rem;
-        margin: 1rem 0;
-        color: #FFF;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,12 +127,6 @@ class CertificateGenerator:
         self.certificate_templates = {
             'basic': {
                 'background_color': (139, 69, 19),  # SaddleBrown
-                'border_color': (255, 215, 0),      # Gold
-                'text_color': (255, 255, 255),      # White
-                'accent_color': (255, 215, 0)       # Gold
-            },
-            'premium': {
-                'background_color': (25, 25, 112),  # MidnightBlue
                 'border_color': (255, 215, 0),      # Gold
                 'text_color': (255, 255, 255),      # White
                 'accent_color': (255, 215, 0)       # Gold
@@ -183,6 +148,7 @@ class CertificateGenerator:
                 text_font = ImageFont.truetype("arial.ttf", 24)
                 small_font = ImageFont.truetype("arial.ttf", 18)
             except:
+                # Fallback to default font
                 title_font = ImageFont.load_default()
                 name_font = ImageFont.load_default()
                 text_font = ImageFont.load_default()
@@ -239,7 +205,7 @@ class CertificateGenerator:
             draw.text(((width - signature_width) // 2, 520), signature_text, fill=self.certificate_templates['basic']['accent_color'], font=text_font)
             
         except Exception as e:
-            # Fallback simple text if font loading fails
+            # Fallback simple text if anything fails
             draw.text((100, 100), "CERTIFICATE OF COMPLETION", fill=(255, 215, 0))
             draw.text((100, 150), f"Awarded to: {student_name}", fill=(255, 255, 255))
             draw.text((100, 200), f"Course: {course_name}", fill=(255, 255, 255))
@@ -266,7 +232,7 @@ class FinanceLearningPlatform:
                 'description': 'Learn how to create and maintain a budget',
                 'level': 'Beginner',
                 'duration': '2 hours',
-                'certificate_threshold': 70,  # Minimum score to get certificate
+                'certificate_threshold': 70,
                 'lessons': [
                     {
                         'id': 1,
@@ -365,12 +331,27 @@ class FinanceLearningPlatform:
         
         self.achievements = {
             'first_lesson': {'name': 'First Step', 'description': 'Complete your first lesson'},
-            'budget_master': {'name': 'Budget Master', 'description': 'Complete Budgeting Basics course'},
             'quiz_champ': {'name': 'Quiz Champion', 'description': 'Score 100% on any quiz'},
-            'consistent_learner': {'name': 'Consistent Learner', 'description': 'Complete 5 lessons'},
-            'video_watcher': {'name': 'Active Learner', 'description': 'Watch 3 video lessons'},
             'certificate_earner': {'name': 'Certified Learner', 'description': 'Earn your first certificate'}
         }
+
+    def calculate_progress(self, completed_lessons):
+        total_lessons = sum(len(course['lessons']) for course in self.courses.values())
+        return (len(completed_lessons) / total_lessons) * 100 if total_lessons > 0 else 0
+
+    def is_lesson_completed(self, course_id, lesson_id, user_progress):
+        return any(lesson['course'] == course_id and lesson['id'] == lesson_id 
+                  for lesson in user_progress['completed_lessons'])
+
+    def mark_lesson_completed(self, course_id, lesson_id, user_progress):
+        if not self.is_lesson_completed(course_id, lesson_id, user_progress):
+            user_progress['completed_lessons'].append({
+                'course': course_id, 
+                'id': lesson_id,
+                'completed_at': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            })
+            return True
+        return False
 
     def calculate_course_score(self, course_id, user_progress):
         """Calculate average score for a course"""
@@ -404,7 +385,7 @@ class FinanceLearningPlatform:
                 'awarded_at': datetime.now().isoformat()
             }
             
-            # Add to certificates list
+            # Initialize certificates list if it doesn't exist
             if 'certificates' not in user_progress:
                 user_progress['certificates'] = []
             
@@ -420,13 +401,21 @@ class FinanceLearningPlatform:
                 return certificate_data
         return None
 
-def main():
-    st.markdown('<h1 class="main-header">💰 FinanceMaster</h1>', unsafe_allow_html=True)
-    st.markdown('<h3 style="text-align: center; color: #666;">Personal Finance Education Platform</h3>', unsafe_allow_html=True)
-    
-    # Initialize platform and session state
-    platform = FinanceLearningPlatform()
-    
+def display_video_lesson(video_id, video_title):
+    """Display YouTube video in a responsive container"""
+    st.markdown(f"""
+    <div class="video-container">
+        <iframe src="https://www.youtube.com/embed/{video_id}" 
+                title="{video_title}" 
+                frameborder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowfullscreen>
+        </iframe>
+    </div>
+    """, unsafe_allow_html=True)
+
+def initialize_session_state():
+    """Initialize all required session state variables"""
     if 'user_progress' not in st.session_state:
         st.session_state.user_progress = {
             'completed_lessons': [],
@@ -436,21 +425,41 @@ def main():
             'current_course': None,
             'current_lesson': 0,
             'watched_videos': [],
-            'student_name': 'Finance Learner'  # Default name
+            'student_name': 'Finance Learner',
+            'student_name_set': False
         }
-    
-    # Student name input
-    if not st.session_state.user_progress.get('student_name_set', False):
-        with st.sidebar:
-            st.subheader("👤 Your Profile")
-            student_name = st.text_input("Enter your name for certificates:", 
-                                       value=st.session_state.user_progress['student_name'])
-            if student_name and st.button("Save Name"):
-                st.session_state.user_progress['student_name'] = student_name
-                st.session_state.user_progress['student_name_set'] = True
-                st.success("Name saved! You'll see this on your certificates.")
-                st.rerun()
 
+def main():
+    st.markdown('<h1 class="main-header">💰 FinanceMaster</h1>', unsafe_allow_html=True)
+    st.markdown('<h3 style="text-align: center; color: #666;">Personal Finance Education Platform</h3>', unsafe_allow_html=True)
+    
+    # Initialize platform and session state
+    platform = FinanceLearningPlatform()
+    initialize_session_state()
+    
+    # Student name input - Moved to main content area for better visibility
+    if not st.session_state.user_progress['student_name_set']:
+        st.info("👋 Welcome! Please set up your profile to get started.")
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            student_name = st.text_input(
+                "Enter your name for certificates:",
+                placeholder="Enter your full name",
+                key="name_input"
+            )
+        with col2:
+            st.write("")  # Spacer
+            st.write("")  # Spacer
+            if st.button("Save Name", type="primary"):
+                if student_name.strip():
+                    st.session_state.user_progress['student_name'] = student_name.strip()
+                    st.session_state.user_progress['student_name_set'] = True
+                    st.success(f"Welcome, {student_name.strip()}! 🎉")
+                    st.rerun()
+                else:
+                    st.error("Please enter your name")
+        st.markdown("---")
+    
     # Sidebar
     with st.sidebar:
         st.header("🎓 Your Learning Dashboard")
@@ -468,162 +477,237 @@ def main():
         st.write(f"**Lessons Completed:** {len(st.session_state.user_progress['completed_lessons'])}")
         st.write(f"**Certificates Earned:** {len(st.session_state.user_progress.get('certificates', []))}")
         
-        # Achievements
-        st.subheader("🏆 Achievements")
-        for achievement in st.session_state.user_progress['achievements']:
-            st.markdown(f'<div class="achievement-badge">{achievement}</div>', unsafe_allow_html=True)
+        # Student info
+        if st.session_state.user_progress['student_name_set']:
+            st.write(f"**Student:** {st.session_state.user_progress['student_name']}")
         
-        # Certificates quick view
-        if st.session_state.user_progress.get('certificates'):
-            st.subheader("📜 Certificates")
-            for cert in st.session_state.user_progress['certificates'][:3]:  # Show latest 3
-                st.markdown(f'<div class="certificate-badge">{cert["course_name"]}</div>', unsafe_allow_html=True)
+        # Achievements
+        if st.session_state.user_progress['achievements']:
+            st.subheader("🏆 Achievements")
+            for achievement in st.session_state.user_progress['achievements']:
+                st.markdown(f'<div class="achievement-badge">{achievement}</div>', unsafe_allow_html=True)
 
     # Main content area
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏠 Home", "📚 Courses", "🎯 Study", "📊 Progress", "🏆 Certificates"])
-
-    with tab5:  # New Certificates Tab
-        st.header("🎓 Your Certificates")
+    if not st.session_state.user_progress['student_name_set']:
+        # Show only basic info until name is set
+        st.info("🔐 Please set your name above to unlock all features")
         
-        if not st.session_state.user_progress.get('certificates'):
-            st.info("Complete courses with passing scores to earn certificates! 🎯")
-            
-            # Show certificate requirements
-            st.subheader("Certificate Requirements:")
-            for course_id, course in platform.courses.items():
-                st.write(f"**{course['title']}**: Score {course['certificate_threshold']}% or higher on all quizzes")
-        else:
-            # Display earned certificates
-            for certificate in st.session_state.user_progress['certificates']:
-                st.markdown("---")
-                
-                # Certificate display
-                col1, col2 = st.columns([2, 1])
-                
-                with col1:
-                    st.markdown(f"""
-                    <div class="certificate-container">
-                        <div class="certificate-title">CERTIFICATE OF COMPLETION</div>
-                        <div class="certificate-subtitle">This certifies that</div>
-                        <div class="certificate-name">{certificate['student_name']}</div>
-                        <div class="certificate-subtitle">has successfully completed</div>
-                        <div class="certificate-course">{certificate['course_name']}</div>
-                        <div class="certificate-subtitle">with a score of {certificate['score']}%</div>
-                        <div class="certificate-date">{certificate['completion_date']}</div>
-                        <div class="certificate-subtitle">Certificate ID: {certificate['certificate_id']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                with col2:
-                    st.subheader("Download Certificate")
-                    
-                    # Generate and download certificate image
-                    cert_image = platform.certificate_generator.generate_certificate_image(
-                        certificate['student_name'],
-                        certificate['course_name'],
-                        certificate['completion_date'],
-                        certificate['score']
-                    )
-                    
-                    # Display certificate preview
-                    st.image(cert_image, use_column_width=True)
-                    
-                    # Download link
-                    download_filename = f"FinanceMaster_Certificate_{certificate['course_id']}_{certificate['completion_date'].replace(' ', '_')}.png"
-                    st.markdown(
-                        platform.certificate_generator.get_certificate_download_link(cert_image, download_filename),
-                        unsafe_allow_html=True
-                    )
-                    
-                    # Share options
-                    st.write("**Share your achievement:**")
-                    st.write("📱 Take a screenshot of your certificate")
-                    st.write("💼 Add to your LinkedIn profile")
-                    st.write("🎯 Share on social media")
+        # Show course preview without interaction
+        st.subheader("Available Courses")
+        for course_id, course in platform.courses.items():
+            with st.expander(f"{course['title']} - {course['level']}"):
+                st.write(course['description'])
+                st.write(f"📚 {len(course['lessons'])} lessons • ⏱️ {course['duration']}")
+        
+    else:
+        # Full app experience when name is set
+        tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏠 Home", "📚 Courses", "🎯 Study", "📊 Progress", "🏆 Certificates"])
 
-            # Certificate statistics
-            st.subheader("📈 Certificate Statistics")
+        with tab1:
+            st.header(f"Welcome, {st.session_state.user_progress['student_name']}! 👋")
+            st.markdown("""
+            ### Your Journey to Financial Freedom Starts Here
+            
+            **Why Learn Personal Finance?**
+            - 💰 Take control of your money
+            - 🏠 Achieve your dream lifestyle
+            - 📈 Build wealth over time
+            - 🛡️ Protect yourself from financial emergencies
+            """)
+            
+            # Quick stats
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Total Certificates", len(st.session_state.user_progress['certificates']))
+                st.metric("Courses Available", len(platform.courses))
             with col2:
-                avg_score = sum(c['score'] for c in st.session_state.user_progress['certificates']) / len(st.session_state.user_progress['certificates'])
-                st.metric("Average Score", f"{avg_score:.1f}%")
+                st.metric("Your Progress", f"{progress:.1f}%")
             with col3:
-                completed_courses = len(set(c['course_id'] for c in st.session_state.user_progress['certificates']))
-                st.metric("Courses Certified", completed_courses)
+                st.metric("Certificates", len(st.session_state.user_progress.get('certificates', [])))
 
-    # Modified Study Tab to include certificate awarding
-    with tab3:
-        if st.session_state.user_progress['current_course']:
-            course_id = st.session_state.user_progress['current_course']
-            lesson_index = st.session_state.user_progress['current_lesson']
-            course = platform.courses[course_id]
-            lesson = course['lessons'][lesson_index]
-            
-            # ... (previous study tab content remains the same)
-            
-            # Enhanced quiz submission to check for certificate eligibility
-            if st.button("Submit Quiz", type="primary"):
-                correct_answers = sum(1 for user_ans, correct_ans in user_answers if user_ans == correct_ans)
-                total_questions = len(lesson['quiz']['questions'])
-                quiz_score = (correct_answers / total_questions) * 100
-                
-                # Update quiz scores
-                st.session_state.user_progress['quiz_scores'][quiz_key] = quiz_score
-                
-                # Mark lesson as completed if quiz passed
-                if quiz_score >= 50:
-                    if platform.mark_lesson_completed(course_id, lesson['id'], st.session_state.user_progress):
-                        st.success(f"🎉 Lesson completed! Quiz score: {quiz_score:.1f}%")
-                        
-                        # Check if course is completed and award certificate
-                        if platform.is_course_completed(course_id, st.session_state.user_progress):
-                            certificate = platform.award_certificate(
-                                course_id, 
-                                st.session_state.user_progress,
-                                st.session_state.user_progress['student_name']
-                            )
-                            if certificate:
-                                st.balloons()
-                                st.success(f"🎓 Congratulations! You've earned a certificate for {course['title']} with score {certificate['score']}%!")
-                                st.info("🎉 Check the 'Certificates' tab to view and download your certificate!")
-                    
-                    st.rerun()
-
-    # Modified Progress Tab to show certificate progress
-    with tab4:
-        st.header("📊 Your Learning Progress")
-        
-        if not st.session_state.user_progress['completed_lessons']:
-            st.info("Start learning to see your progress here!")
-        else:
-            # Certificate progress section
-            st.subheader("📜 Certificate Progress")
+        with tab2:
+            st.header("📚 All Courses")
             for course_id, course in platform.courses.items():
-                completed = platform.is_course_completed(course_id, st.session_state.user_progress)
-                course_score = platform.calculate_course_score(course_id, st.session_state.user_progress)
-                has_certificate = any(c['course_id'] == course_id for c in st.session_state.user_progress.get('certificates', []))
+                with st.expander(f"{course['title']} - {course['level']} - {course['duration']}", expanded=True):
+                    st.write(course['description'])
+                    st.write(f"**Certificate Threshold:** {course['certificate_threshold']}% average score")
+                    
+                    # Lessons list
+                    for i, lesson in enumerate(course['lessons']):
+                        is_completed = platform.is_lesson_completed(course_id, lesson['id'], st.session_state.user_progress)
+                        status = "✅" if is_completed else "📖"
+                        if st.button(f"{status} {lesson['title']} - {lesson['duration']}", 
+                                   key=f"study_{course_id}_{i}",
+                                   use_container_width=True):
+                            st.session_state.user_progress['current_course'] = course_id
+                            st.session_state.user_progress['current_lesson'] = i
+                            st.rerun()
+
+        with tab3:
+            if st.session_state.user_progress['current_course']:
+                course_id = st.session_state.user_progress['current_course']
+                lesson_index = st.session_state.user_progress['current_lesson']
+                course = platform.courses[course_id]
+                lesson = course['lessons'][lesson_index]
                 
-                col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
+                st.header(f"{course['title']}")
+                st.subheader(f"Lesson: {lesson['title']}")
+                
+                # Progress
+                completed_in_course = len([l for l in st.session_state.user_progress['completed_lessons'] if l['course'] == course_id])
+                total_in_course = len(course['lessons'])
+                course_progress = (completed_in_course / total_in_course) * 100
+                
+                st.markdown(f"""
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {course_progress}%"></div>
+                </div>
+                <p>Course Progress: {completed_in_course}/{total_in_course} lessons ({course_progress:.1f}%)</p>
+                """, unsafe_allow_html=True)
+                
+                # Video lesson
+                st.subheader("🎥 Video Lesson")
+                display_video_lesson(lesson['video_id'], lesson['video_title'])
+                
+                # Lesson content
+                st.subheader("📖 Lesson Content")
+                st.markdown(lesson['content'])
+                
+                # Quiz
+                st.subheader("🧠 Knowledge Check")
+                with st.container():
+                    st.markdown('<div class="quiz-card">', unsafe_allow_html=True)
+                    
+                    user_answers = []
+                    quiz_key = f"{course_id}_{lesson['id']}"
+                    
+                    for i, q in enumerate(lesson['quiz']['questions']):
+                        st.write(f"**Q{i+1}: {q['question']}**")
+                        answer = st.radio(f"Select your answer:", q['options'], key=f"quiz_{quiz_key}_{i}")
+                        user_answers.append((q['options'].index(answer), q['correct']))
+                    
+                    if st.button("Submit Quiz", type="primary"):
+                        correct_answers = sum(1 for user_ans, correct_ans in user_answers if user_ans == correct_ans)
+                        total_questions = len(lesson['quiz']['questions'])
+                        quiz_score = (correct_answers / total_questions) * 100
+                        
+                        st.session_state.user_progress['quiz_scores'][quiz_key] = quiz_score
+                        
+                        if quiz_score >= 50:
+                            if platform.mark_lesson_completed(course_id, lesson['id'], st.session_state.user_progress):
+                                st.success(f"🎉 Lesson completed! Score: {quiz_score:.1f}%")
+                                
+                                # Check for certificate
+                                if platform.is_course_completed(course_id, st.session_state.user_progress):
+                                    certificate = platform.award_certificate(
+                                        course_id, 
+                                        st.session_state.user_progress,
+                                        st.session_state.user_progress['student_name']
+                                    )
+                                    if certificate:
+                                        st.balloons()
+                                        st.success(f"🎓 Certificate earned! Score: {certificate['score']}%")
+                            else:
+                                st.info(f"Score: {quiz_score:.1f}% - Lesson already completed")
+                        else:
+                            st.warning(f"Score: {quiz_score:.1f}% - Try again (need 50%+)")
+                        
+                        st.rerun()
+                    
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # Navigation
+                col1, col2, col3 = st.columns([1, 1, 1])
                 with col1:
-                    st.write(f"**{course['title']}**")
+                    if lesson_index > 0 and st.button("← Previous"):
+                        st.session_state.user_progress['current_lesson'] = lesson_index - 1
+                        st.rerun()
                 with col2:
-                    status = "✅ Certified" if has_certificate else "📖 In Progress" if completed else "⏳ Learning"
-                    st.write(status)
+                    if st.button("🏠 Back to Courses"):
+                        st.session_state.user_progress['current_course'] = None
+                        st.rerun()
                 with col3:
-                    st.write(f"Score: {course_score:.1f}%")
-                with col4:
-                    if completed and not has_certificate and course_score >= course['certificate_threshold']:
-                        if st.button("🎓 Get Certificate", key=f"cert_{course_id}"):
-                            certificate = platform.award_certificate(
-                                course_id, 
-                                st.session_state.user_progress,
-                                st.session_state.user_progress['student_name']
-                            )
-                            if certificate:
-                                st.success("Certificate awarded! Check the Certificates tab.")
-                                st.rerun()
+                    if lesson_index < len(course['lessons']) - 1 and st.button("Next →"):
+                        st.session_state.user_progress['current_lesson'] = lesson_index + 1
+                        st.rerun()
+            else:
+                st.info("Select a lesson from the Courses tab to start studying!")
+                st.image("https://via.placeholder.com/600x200/1f77b4/ffffff?text=Choose+a+Lesson+to+Begin", use_column_width=True)
+
+        with tab4:
+            st.header("📊 Your Learning Progress")
+            
+            if not st.session_state.user_progress['completed_lessons']:
+                st.info("Start learning to see your progress here!")
+            else:
+                # Progress metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Lessons Completed", len(st.session_state.user_progress['completed_lessons']))
+                with col2:
+                    courses_started = len(set([l['course'] for l in st.session_state.user_progress['completed_lessons']]))
+                    st.metric("Courses Started", courses_started)
+                with col3:
+                    avg_score = np.mean(list(st.session_state.user_progress['quiz_scores'].values())) if st.session_state.user_progress['quiz_scores'] else 0
+                    st.metric("Average Quiz Score", f"{avg_score:.1f}%")
+                
+                # Course progress
+                st.subheader("Course Progress")
+                for course_id, course in platform.courses.items():
+                    completed = len([l for l in st.session_state.user_progress['completed_lessons'] if l['course'] == course_id])
+                    total = len(course['lessons'])
+                    progress_pct = (completed / total) * 100
+                    
+                    st.write(f"**{course['title']}**")
+                    st.markdown(f"""
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {progress_pct}%"></div>
+                    </div>
+                    <p>{completed}/{total} lessons ({progress_pct:.1f}%)</p>
+                    """, unsafe_allow_html=True)
+
+        with tab5:
+            st.header("🏆 Your Certificates")
+            
+            certificates = st.session_state.user_progress.get('certificates', [])
+            if not certificates:
+                st.info("Complete courses with passing scores to earn certificates! 🎯")
+                st.write("**Certificate Requirements:**")
+                for course_id, course in platform.courses.items():
+                    st.write(f"- **{course['title']}**: Complete all lessons with {course['certificate_threshold']}% average score")
+            else:
+                for cert in certificates:
+                    st.markdown("---")
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="certificate-container">
+                            <div style="font-size: 2.5rem; font-weight: bold; color: #FFD700; margin-bottom: 1rem;">CERTIFICATE OF COMPLETION</div>
+                            <div style="font-size: 1.2rem; margin-bottom: 1rem;">This certifies that</div>
+                            <div style="font-size: 2rem; font-weight: bold; color: #FFD700; margin: 1rem 0; text-decoration: underline;">{cert['student_name']}</div>
+                            <div style="font-size: 1.2rem; margin-bottom: 1rem;">has successfully completed</div>
+                            <div style="font-size: 1.8rem; font-weight: bold; color: white; margin: 1rem 0;">{cert['course_name']}</div>
+                            <div style="font-size: 1.2rem; margin-bottom: 1rem;">with a score of {cert['score']}%</div>
+                            <div style="font-size: 1rem; margin: 1rem 0;">Completed on: {cert['completion_date']}</div>
+                            <div style="font-size: 0.9rem; margin-top: 2rem;">Certificate ID: {cert['certificate_id']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        # Generate and offer download
+                        cert_image = platform.certificate_generator.generate_certificate_image(
+                            cert['student_name'],
+                            cert['course_name'],
+                            cert['completion_date'],
+                            cert['score']
+                        )
+                        
+                        st.image(cert_image, use_column_width=True)
+                        download_filename = f"Certificate_{cert['course_name'].replace(' ', '_')}.png"
+                        st.markdown(
+                            platform.certificate_generator.get_certificate_download_link(cert_image, download_filename),
+                            unsafe_allow_html=True
+                        )
 
 if __name__ == "__main__":
     main()
